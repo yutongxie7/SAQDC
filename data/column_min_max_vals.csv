@@ -1,0 +1,14 @@
+name,min,max,cardinality,num_unique_values
+age,18,90,5000000,73
+workclass,0,6,5000000,7
+education,0,15,5000000,16
+educationnum,1,19,5000000,19
+maritalstatus,0,6,5000000,7
+occupation,0,13,5000000,14
+relationship,0,5,5000000,6
+race,0,4,5000000,5
+sex,0,1,5000000,2
+hoursperweek,1,100,5000000,98
+nativecountry,0,40,5000000,41
+income,0,1,5000000,2
+height,150,181,5000000,32
