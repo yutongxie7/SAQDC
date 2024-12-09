@@ -64,78 +64,55 @@ def predict(model, data_loader, cuda):
     return preds, t_total
 
 
-def print_qerror(preds_unnorm, labels_unnorm):
-    qerror = []
-    print("pred长度")
-    print(len(preds_unnorm))
-
-    print("lable长度")
-    print(len(labels_unnorm))
-    for i in range(len(preds_unnorm)):
-        print(preds_unnorm[i],"和",labels_unnorm[i])
-    for i in range(len(preds_unnorm)):
-        if preds_unnorm[i][0] > float(labels_unnorm[i]):
-            qerror.append(preds_unnorm[i][0] / float(labels_unnorm[i]))
-        else:
-            qerror.append(float(labels_unnorm[i]) / float(preds_unnorm[i][0]))
-    print("error长度")
-    print(len(qerror))
-    qerror = np.array(qerror)
 
 
-    print("90th percentile: {}".format(np.percentile(qerror, 90)))
-    print("95th percentile: {}".format(np.percentile(qerror, 95)))
-    print("99th percentile: {}".format(np.percentile(qerror, 99)))
-    print("Max: {}".format(np.max(qerror)))
-    print("Mean: {}".format(np.mean(qerror)))
 
-def train_(workload_name, num_queries, num_epochs, batch_size, hid_units, cuda):
+def eval(workload_name, num_queries, batch_size, hid_units, cuda):
 
     num_materialized_samples = 1000
     dicts, column_min_max_vals, min_val, max_val, labels_train, labels_test, max_num_predicates, train_data, test_data = get_train_datasets(
         num_queries, num_materialized_samples)
     column2vec, op2vec = dicts
+    model = load_model("model/setconv_model.pth", 8, 256, False)
 
-    predicate_feats = len(column2vec) + len(op2vec) + 1
 
-    model = SetConv( predicate_feats,  hid_units)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    file_name = "workloads/" + workload_name
+    joins, predicates, tables, samples, label = load_data(file_name, num_materialized_samples)
 
+    # Get feature encoding and proper normalization
+    # samples_test = encode_samples(tables, samples, table2vec)
+    predicates_test = encode_data(predicates, column_min_max_vals, column2vec, op2vec)
+    labels_test, _, _ = normalize_labels(label, min_val, max_val)
+
+
+    max_num_predicates = max([len(p) for p in predicates_test])
+
+
+    # Get test set predictions
+    test_data = make_dataset(predicates_test, labels_test, max_num_predicates)
+    test_data_loader = DataLoader(test_data, batch_size=batch_size)
+
+    preds_test, t_total = predict(model, test_data_loader, cuda)
+    print("Prediction time per test sample: {}".format(t_total / len(labels_test) * 1000))
+
+    # Unnormalize
+    preds_test_unnorm = unnormalize_labels(preds_test, min_val, max_val)
+    # Print metrics
+    # Write predictions
+    file_name = "results/predictions_" + workload_name + ".csv"
+    os.makedirs(os.path.dirname(file_name), exist_ok=True)
+    with open(file_name, "w") as f:
+        for i in range(len(preds_test_unnorm)):
+            f.write(str(preds_test_unnorm[i]) + "," + str(label[i]) + "\n")
+    print("Prediction time per test sample: {}".format(t_total / len(labels_test) * 1000))
+    print("evaling finished")
+def load_model(model_path, predicate_feats, hid_units, cuda):
+    model = SetConv(predicate_feats, hid_units)
+    model.load_state_dict(torch.load(model_path))
     if cuda:
         model.cuda()
-    train_data_loader = DataLoader(train_data, batch_size=batch_size)
-    test_data_loader = DataLoader(test_data, batch_size=batch_size)
-    model.train()
-    for epoch in range(num_epochs):
-        loss_total = 0.
-
-        for batch_idx, data_batch in enumerate(train_data_loader):
-
-
-            predicates, targets,  predicate_masks = data_batch
-
-
-            if cuda:
-                predicates, targets = predicates.cuda(),  targets.cuda()
-                predicate_masks = predicate_masks.cuda(),
-            predicates,  targets = Variable(predicates),  Variable(
-                targets)
-            predicate_masks = Variable(predicate_masks)
-
-            optimizer.zero_grad()
-            outputs = model(predicates, predicate_masks)
-            loss = qerror_loss(outputs, targets.float(), min_val, max_val)
-            loss_total += loss.item()
-            loss.backward()
-            optimizer.step()
-
-        print("Epoch {}, loss: {}".format(epoch, loss_total / len(train_data_loader)))
-
-   # Save the model
-    model_path = "model/setconv_model1.pth"
-    torch.save(model.state_dict(), model_path)
-    print(f"Model saved to {model_path}")
-
+    model.eval()  # Set the model to evaluation mode
+    return model
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("testset", help="synthetic, scale, or job-light")
@@ -145,7 +122,7 @@ def main():
     parser.add_argument("--hid", help="number of hidden units (default: 256)", type=int, default=256)
     parser.add_argument("--cuda", help="use CUDA", action="store_true")
 
-    train_("synthetic", 150000, 200, 1024, 256, False)
+    eval("synthetic", 150000,  1024, 256, False)
 
     # Perform predictions
 
