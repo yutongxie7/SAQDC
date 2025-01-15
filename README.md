@@ -1,5 +1,8 @@
-# SAQDC
-我们在Classfier文件夹下公布了我们的核心代码，用于进行推测查询误差的分类器。
-我们给出的示例训练集包含150000条数据。包括pre、op、vl.
-执行train.py可以运行训练模型。
-执行eval.py可以进行模型推断。
+SAQDC
+#We have published our core code for classifying query error predictions in the Classifier folder.
+
+#The example training set we provide contains 150,000 data entries, including pre, op, and vl.
+
+#Running train.py will execute the model training.
+
+#Executing eval.py will perform model inference.
