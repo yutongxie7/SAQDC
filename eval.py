@@ -144,10 +144,18 @@ def eval(workload_name, num_queries, batch_size, hid_units, cuda):
     file_path = os.path.join(folder_path, 'output.csv')
     with open(file_path, mode='w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(["rspn_pr_result", "label"])  # 写入表头
+        writer.writerow(["rspn_pr_result", "label_rspn"])  # 写入表头
         for i in range(len(rspn_pr_result)):
             writer.writerow([rspn_pr_result[i], label[i]])  # 写入每行数据
 
+    folder_path = './model_AR'
+
+    file_path = os.path.join(folder_path, 'output.csv')
+    with open(file_path, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(["ar_pr_result", "label_ar"])  # 写入表头
+        for i in range(len(rspn_pr_result)):
+            writer.writerow([ar_pr_result[i], label_ar[i]])  # 写入每行数据
 
 def load_model(model_path, predicate_feats, hid_units, cuda):
     model = SetConv(predicate_feats, hid_units)
