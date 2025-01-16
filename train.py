@@ -1,6 +1,6 @@
 import argparse
 import time
-import os
+
 import torch
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
@@ -10,6 +10,7 @@ from model.data import get_train_datasets, load_data, make_dataset
 from model.model import SetConv
 
 def unnormalize_torch(vals, min_val, max_val):
+
     # 反归一化
     vals = (vals * (max_val - min_val)) + min_val
 
@@ -24,24 +25,59 @@ def unnormalize_torch(vals, min_val, max_val):
         vals = torch.exp(vals)
 
     return vals
+def unnormalize_torch_pre(vals, min_val, max_val,min_val_ar, max_val_ar):
+    tensor1 = vals[:, 0].unsqueeze(1)  # 获取第一列并增加维度
+    tensor2 = vals[:, 1].unsqueeze(1)  # 获取第二列并增加维度
+    # 反归一化
+    tensor1 = (tensor1 * (max_val - min_val)) + min_val
+    # 判断是否需要处理负值
+    if min_val < 0:
+        # 对于负值，使用相应的反归一化逻辑
+        neg_mask = tensor1 < 0
+        # 对于负值，使用 1 / exp(-vals) 来恢复
+        tensor1 = torch.where(neg_mask, -torch.exp(-tensor1), torch.exp(tensor1))
+    else:
+        # 对于非负值，直接使用指数还原
+        tensor1 = torch.exp(tensor1)
 
-def qerror_loss(preds, targets, min_val, max_val):
+    tensor2 = (tensor2 * (max_val_ar - min_val_ar)) + min_val_ar
+    # 判断是否需要处理负值
+    if min_val_ar < 0:
+        # 对于负值，使用相应的反归一化逻辑
+        neg_mask = tensor2 < 0
+        # 对于负值，使用 1 / exp(-vals) 来恢复
+        tensor2 = torch.where(neg_mask, -torch.exp(-tensor2), torch.exp(tensor2))
+    else:
+        # 对于非负值，直接使用指数还原
+        tensor2 = torch.exp(tensor2)
+
+    return tensor1,tensor2
+
+def qerror_loss(preds, targets, targets_ar,min_val, max_val,min_val_ar, max_val_ar):
     qerror = []
-    preds = unnormalize_torch(preds, min_val, max_val)
+    preds = unnormalize_torch_pre(preds, min_val, max_val,min_val_ar, max_val_ar)
     targets = unnormalize_torch(targets, min_val, max_val)
-
+    targets_ar = unnormalize_torch(targets_ar, min_val_ar, max_val_ar)
+    rspn=preds[0]
+    ar=preds[1]
     for i in range(len(targets)):
-        if (preds[i] > targets[i]).cpu().data.numpy()[0]:
-            qerror.append(abs(preds[i] - targets[i]))
-        else:
-            qerror.append(abs(targets[i] - preds[i]))
-    return torch.mean(torch.cat(qerror))
 
+        if (rspn[i] > targets[i]).cpu().data.numpy()[0]:
+            qerror.append(abs(rspn[i] - targets[i]))
+        else:
+            qerror.append(abs(targets[i] - rspn[i]))
+
+    for i in range(len(targets_ar)):
+
+        if (ar[i] > targets_ar[i]).cpu().data.numpy()[0]:
+            qerror.append(abs(ar[i] - targets_ar[i]))
+        else:
+            qerror.append(abs(targets_ar[i] - ar[i]))
+    return torch.mean(torch.cat(qerror))
 
 def predict(model, data_loader, cuda):
     preds = []
     t_total = 0.
-
     model.eval()
     for batch_idx, data_batch in enumerate(data_loader):
 
@@ -69,7 +105,7 @@ def print_qerror(preds_unnorm, labels_unnorm):
     print("pred长度")
     print(len(preds_unnorm))
 
-    print("lable长度")
+
     print(len(labels_unnorm))
     for i in range(len(preds_unnorm)):
         print(preds_unnorm[i],"和",labels_unnorm[i])
@@ -78,26 +114,15 @@ def print_qerror(preds_unnorm, labels_unnorm):
             qerror.append(preds_unnorm[i][0] / float(labels_unnorm[i]))
         else:
             qerror.append(float(labels_unnorm[i]) / float(preds_unnorm[i][0]))
-    print("error长度")
-    print(len(qerror))
-    qerror = np.array(qerror)
 
-
-    print("90th percentile: {}".format(np.percentile(qerror, 90)))
-    print("95th percentile: {}".format(np.percentile(qerror, 95)))
-    print("99th percentile: {}".format(np.percentile(qerror, 99)))
-    print("Max: {}".format(np.max(qerror)))
-    print("Mean: {}".format(np.mean(qerror)))
 
 def train_(workload_name, num_queries, num_epochs, batch_size, hid_units, cuda):
 
     num_materialized_samples = 1000
-    dicts, column_min_max_vals, min_val, max_val, labels_train, labels_test, max_num_predicates, train_data, test_data = get_train_datasets(
+    dicts, column_min_max_vals, min_val, max_val, min_val_ar, max_val_ar,labels_train,labels_train_ar, labels_test, labels_test_ar,max_num_predicates, train_data, test_data = get_train_datasets(
         num_queries, num_materialized_samples)
     column2vec, op2vec = dicts
-
     predicate_feats = len(column2vec) + len(op2vec) + 1
-
     model = SetConv( predicate_feats,  hid_units)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
@@ -108,23 +133,22 @@ def train_(workload_name, num_queries, num_epochs, batch_size, hid_units, cuda):
     model.train()
     for epoch in range(num_epochs):
         loss_total = 0.
-
         for batch_idx, data_batch in enumerate(train_data_loader):
-
-
-            predicates, targets,  predicate_masks = data_batch
-
-
+            predicates, targets, targets_ar, predicate_masks = data_batch
             if cuda:
-                predicates, targets = predicates.cuda(),  targets.cuda()
+                predicates, targets ,targets_ar= predicates.cuda(),  targets.cuda() ,targets_ar.cuda()
                 predicate_masks = predicate_masks.cuda(),
-            predicates,  targets = Variable(predicates),  Variable(
-                targets)
+            predicates,  targets ,targets_ar= Variable(predicates),  Variable(
+                targets) ,Variable(
+                targets_ar)
             predicate_masks = Variable(predicate_masks)
 
             optimizer.zero_grad()
             outputs = model(predicates, predicate_masks)
-            loss = qerror_loss(outputs, targets.float(), min_val, max_val)
+
+
+            loss = qerror_loss(outputs, targets.float(),targets_ar.float(), min_val, max_val,min_val_ar,max_val_ar)
+
             loss_total += loss.item()
             loss.backward()
             optimizer.step()
