@@ -4,7 +4,7 @@ import numpy as np
 # Helper functions for data processing
 
 def chunks(l, n):
-    """Yield successive n-sized chunks from l."""
+
     for i in range(0, len(l), n):
         yield l[i:i + n]
 
@@ -89,7 +89,6 @@ def normalize_data(val, column_name, column_min_max_vals):
         val_norm = (val - min_val) / (max_val - min_val)
     return np.array(val_norm, dtype=np.float32)
 
-
 def normalize_labels(labels, min_val=None, max_val=None):
     #labels = np.array([np.log(float(l)) for l in labels])
     labels = np.array([np.log(float(l)) if float(l) > 0 else np.log(1 / abs(float(l))) for l in labels])#映射负数
@@ -105,14 +104,6 @@ def normalize_labels(labels, min_val=None, max_val=None):
     labels_norm = np.minimum(labels_norm, 1)
     labels_norm = np.maximum(labels_norm, 0)
     return labels_norm, min_val, max_val
-
-
-# def unnormalize_labels(labels_norm, min_val, max_val):
-#     labels_norm = np.array(labels_norm, dtype=np.float32)
-#     labels = (labels_norm * (max_val - min_val)) + min_val
-#     return np.array(np.round(np.exp(labels)), dtype=np.int64)
-
-
 def unnormalize_labels(labels_norm, min_val, max_val):
     labels_norm = np.array(labels_norm, dtype=np.float32)
 
@@ -144,7 +135,7 @@ def encode_samples(tables, samples, table2vec):
     return samples_enc
 
 
-def encode_data(predicates, column_min_max_vals, column2vec, op2vec):#把连接和谓词修改掉  变成只有谓词
+def encode_data(predicates, column_min_max_vals, column2vec, op2vec):
     predicates_enc = []
 
     for i, query in enumerate(predicates):
