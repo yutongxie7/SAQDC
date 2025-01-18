@@ -167,14 +167,14 @@ def load_model(model_path, predicate_feats, hid_units, cuda):
     return model
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("testset", help="synthetic")
+    parser.add_argument("testset", help="adult")
     parser.add_argument("--queries", help="number of training queries (default: 10000)", type=int, default=10000)
     parser.add_argument("--epochs", help="number of epochs (default: 10)", type=int, default=10)
     parser.add_argument("--batch", help="batch size (default: 1024)", type=int, default=1024)
     parser.add_argument("--hid", help="number of hidden units (default: 256)", type=int, default=256)
     parser.add_argument("--cuda", help="use CUDA", action="store_true")
 
-    eval("synthetic", 150000,  1024, 256, False)
+    eval("adult", 150000,  1024, 256, False)
 
     # Perform predictions
 

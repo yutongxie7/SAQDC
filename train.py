@@ -53,8 +53,31 @@ def unnormalize_torch_pre(vals, min_val, max_val,min_val_ar, max_val_ar):
 
     return tensor1,tensor2
 
+# def qerror_loss(preds, targets, targets_ar,min_val, max_val,min_val_ar, max_val_ar):
+#     qerror = []
+#     preds = unnormalize_torch_pre(preds, min_val, max_val,min_val_ar, max_val_ar)
+#     targets = unnormalize_torch(targets, min_val, max_val)
+#     targets_ar = unnormalize_torch(targets_ar, min_val_ar, max_val_ar)
+#     rspn=preds[0]
+#     ar=preds[1]
+#     for i in range(len(targets)):
+#
+#         if (rspn[i] > targets[i]).cpu().data.numpy()[0]:
+#             qerror.append(abs(rspn[i] - targets[i]))
+#         else:
+#             qerror.append(abs(targets[i] - rspn[i]))
+#
+#     for i in range(len(targets_ar)):
+#
+#         if (ar[i] > targets_ar[i]).cpu().data.numpy()[0]:
+#             qerror.append(abs(ar[i] - targets_ar[i]))
+#         else:
+#             qerror.append(abs(targets_ar[i] - ar[i]))
+#     return torch.mean(torch.cat(qerror))
+import torch
 def qerror_loss(preds, targets, targets_ar,min_val, max_val,min_val_ar, max_val_ar):
     qerror = []
+    qerror1 = []
     preds = unnormalize_torch_pre(preds, min_val, max_val,min_val_ar, max_val_ar)
     targets = unnormalize_torch(targets, min_val, max_val)
     targets_ar = unnormalize_torch(targets_ar, min_val_ar, max_val_ar)
@@ -70,10 +93,31 @@ def qerror_loss(preds, targets, targets_ar,min_val, max_val,min_val_ar, max_val_
     for i in range(len(targets_ar)):
 
         if (ar[i] > targets_ar[i]).cpu().data.numpy()[0]:
-            qerror.append(abs(ar[i] - targets_ar[i]))
+            qerror1.append(abs(ar[i] - targets_ar[i]))
         else:
-            qerror.append(abs(targets_ar[i] - ar[i]))
-    return torch.mean(torch.cat(qerror))
+            qerror1.append(abs(targets_ar[i] - ar[i]))
+    result = list(map(lambda a, b: a + b, qerror, qerror1))
+    return torch.mean(torch.cat(result))
+import torch
+
+# def qerror_loss(preds, targets, targets_ar, min_val, max_val, min_val_ar, max_val_ar):
+#     # Unnormalize predictions and targets
+#     preds = unnormalize_torch_pre(preds, min_val, max_val, min_val_ar, max_val_ar)
+#     targets = unnormalize_torch(targets, min_val, max_val)
+#     targets_ar = unnormalize_torch(targets_ar, min_val_ar, max_val_ar)
+#
+#     rspn = preds[0]
+#     ar = preds[1]
+#
+#     # Compute absolute differences for rspn and targets
+#     qerror_rspn = torch.abs(rspn - targets)
+#     qerror_ar = torch.abs(ar - targets_ar)
+#
+#     # Combine rspn and ar errors
+#     qerror = torch.cat((qerror_rspn, qerror_ar), dim=0)
+#
+#     return torch.mean(qerror)
+
 
 def predict(model, data_loader, cuda):
     preds = []
@@ -102,6 +146,11 @@ def predict(model, data_loader, cuda):
 
 def print_qerror(preds_unnorm, labels_unnorm):
     qerror = []
+    print("pred长度")
+    print(len(preds_unnorm))
+
+
+    print(len(labels_unnorm))
     for i in range(len(preds_unnorm)):
         print(preds_unnorm[i],"和",labels_unnorm[i])
     for i in range(len(preds_unnorm)):
@@ -157,15 +206,16 @@ def train_(workload_name, num_queries, num_epochs, batch_size, hid_units, cuda):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("testset", help="synthetic")
+    parser.add_argument("testset", help="adult")
     parser.add_argument("--queries", help="number of training queries (default: 10000)", type=int, default=10000)
     parser.add_argument("--epochs", help="number of epochs (default: 10)", type=int, default=10)
     parser.add_argument("--batch", help="batch size (default: 1024)", type=int, default=1024)
     parser.add_argument("--hid", help="number of hidden units (default: 256)", type=int, default=256)
     parser.add_argument("--cuda", help="use CUDA", action="store_true")
 
-    train_("synthetic", 150000, 200, 1024, 256, False)
+    train_("adult", 150000, 300, 1024, 256, False)
 
+    # Perform predictions
 
 if __name__ == "__main__":
     main()
