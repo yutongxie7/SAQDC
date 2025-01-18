@@ -102,11 +102,6 @@ def predict(model, data_loader, cuda):
 
 def print_qerror(preds_unnorm, labels_unnorm):
     qerror = []
-    print("pred长度")
-    print(len(preds_unnorm))
-
-
-    print(len(labels_unnorm))
     for i in range(len(preds_unnorm)):
         print(preds_unnorm[i],"和",labels_unnorm[i])
     for i in range(len(preds_unnorm)):
