@@ -166,7 +166,6 @@ def main():
 
     train_("synthetic", 150000, 200, 1024, 256, False)
 
-    # Perform predictions
 
 if __name__ == "__main__":
     main()
